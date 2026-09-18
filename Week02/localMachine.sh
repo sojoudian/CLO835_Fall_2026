@@ -45,10 +45,18 @@ docker logs webapp
 docker tag simple-webapp-flask:v1 <user>/simple-webapp-flask:v1
 
 ########################################################
-# 6) Publish
+# 6) Publish for every CPU
 ########################################################
+# Step 3 built one image for YOUR CPU. A Mac with Apple Silicon builds arm64,
+# and the EC2 machine is x86_64. That image fails there with "exec format error".
+#
+# buildx builds both, and --push sends both under one name. Docker then picks
+# the correct one on each machine. It replaces the tag and the push above.
 docker login
-docker push <user>/simple-webapp-flask:v1
+docker buildx build --platform linux/amd64,linux/arm64 -t <user>/simple-webapp-flask:v1 --push .
+
+# Check that both are there:
+docker buildx imagetools inspect <user>/simple-webapp-flask:v1
 
 ########################################################
 # 7) Prove the point
