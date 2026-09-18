@@ -31,33 +31,8 @@ data "aws_subnets" "default" {
   }
 }
 
-data "aws_subnet" "each" {
-  for_each = toset(data.aws_subnets.default.ids)
-  id       = each.value
-}
-
-# Not every zone offers every instance type. us-east-1e offers neither
-# m5.large nor r5.large, so a fixed subnet choice can fail at launch.
-data "aws_ec2_instance_type_offerings" "for_type" {
-  location_type = "availability-zone"
-
-  filter {
-    name   = "instance-type"
-    values = [local.instance_type]
-  }
-}
-
 locals {
-  # m5.large: 2 vCPU / 8 GB. The Learner Lab blocks xlarge and larger, and it
-  # stops newer generations such as r6i a few seconds after launch.
-  instance_type = "m5.large"
-
-  good_zones = toset(data.aws_ec2_instance_type_offerings.for_type.locations)
-
-  lab_subnet_id = sort([
-    for s in data.aws_subnet.each : s.id
-    if contains(local.good_zones, s.availability_zone)
-  ])[0]
+  lab_subnet_id = sort(data.aws_subnets.default.ids)[0]
 }
 
 ########################################################
@@ -108,7 +83,7 @@ resource "aws_security_group_rule" "egress" {
 ########################################################
 resource "aws_instance" "vm" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = local.instance_type
+  instance_type          = "r5.large" # 2 vCPU / 16 GB (the Learner Lab blocks xlarge and larger, and newer generations such as r6i)
   key_name               = var.key_name
   subnet_id              = local.lab_subnet_id
   vpc_security_group_ids = [aws_security_group.vm.id]
