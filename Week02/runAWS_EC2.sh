@@ -17,11 +17,16 @@ ls -l                                # app.py  Dockerfile  requirements.txt
 ########################################################
 sudo apt-get update -y
 sudo apt-get install -y python3 python3-venv
-python3 --version                    # 3.14.x on Ubuntu 26.04
+python3 --version                    # 3.14.4 on Ubuntu 26.04
 
 ########################################################
-# 3) Install Flask - the old way FAILS
+# 3) Try the old way - it FAILS twice
 ########################################################
+pip3 install flask
+# Command 'pip3' not found. Ubuntu 26.04 ships no pip at all.
+#
+# Install it, then try again:
+sudo apt-get install -y python3-pip
 pip3 install flask
 # error: externally-managed-environment
 # Ubuntu 24.04 and later protect the system Python (PEP 668).
