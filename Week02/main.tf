@@ -54,27 +54,16 @@ resource "aws_security_group_rule" "ssh" {
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
-# app.py calls app.run(port=8080) -> the manual run answers on 8080.
 resource "aws_security_group_rule" "app_manual" {
   type              = "ingress"
   security_group_id = aws_security_group.vm.id
-  description       = "Flask app, manual run (python3 app.py)"
+  description       = "Flask app"
   protocol          = "tcp"
   from_port         = 8080
   to_port           = 8080
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
-# The Dockerfile runs flask run --port=18080 -> the container answers on 18080.
-resource "aws_security_group_rule" "app_container" {
-  type              = "ingress"
-  security_group_id = aws_security_group.vm.id
-  description       = "Flask app, container run (docker run)"
-  protocol          = "tcp"
-  from_port         = 18080
-  to_port           = 18080
-  cidr_blocks       = ["0.0.0.0/0"]
-}
 
 resource "aws_security_group_rule" "egress" {
   type              = "egress"
@@ -129,9 +118,6 @@ output "next_step" {
   value = "ssh -i <your-key.pem> ubuntu@${aws_instance.vm.public_ip}   # then follow runAWS_EC2.sh"
 }
 
-output "urls" {
-  value = {
-    manual_run    = "http://${aws_instance.vm.public_ip}:8080/"
-    container_run = "http://${aws_instance.vm.public_ip}:18080/"
-  }
+output "app_url" {
+  value = "http://${aws_instance.vm.public_ip}:8080/"
 }

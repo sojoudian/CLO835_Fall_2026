@@ -22,8 +22,7 @@ cat Dockerfile
 #   RUN pip install -r requirements.txt        == Part 1, step 4
 #   CMD ["python3", "app.py"]                  == Part 1, step 5
 #
-# The container runs the SAME command as the manual way.
-# Only ENV PORT=18080 differs, so the container answers on 18080.
+# The container runs the SAME command on the SAME port as the manual way.
 
 ########################################################
 # 3) Build
@@ -34,9 +33,9 @@ docker images | grep simple-webapp-flask
 ########################################################
 # 4) Run and test
 ########################################################
-docker run -d --name webapp -p 18080:18080 simple-webapp-flask:v1
+docker run -d --name webapp -p 8080:8080 simple-webapp-flask:v1
 docker ps
-curl http://localhost:18080/         # Welcome CLO835!
+curl http://localhost:8080/         # Welcome CLO835!
 docker logs webapp
 
 ########################################################
@@ -55,7 +54,7 @@ docker push <user>/simple-webapp-flask:v1
 # 7) Prove the point
 ########################################################
 # On the EC2 machine, or on ANY computer with Docker:
-#   docker run -d -p 18080:18080 <user>/simple-webapp-flask:v1
+#   docker run -d -p 8080:8080 <user>/simple-webapp-flask:v1
 # One command repeats all 6 steps of Part 1.
 
 ########################################################

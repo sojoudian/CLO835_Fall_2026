@@ -46,12 +46,12 @@ The lab stops the machine between sessions, and the address changes. Run
 
 ## 4. The lab
 
-| Script | Run it on | Port |
-|---|---|--:|
-| `runAWS_EC2.sh` | the EC2 machine | 8080 |
-| `localMachine.sh` | your laptop | 18080 |
+| Script | Run it on |
+|---|---|
+| `runAWS_EC2.sh` | the EC2 machine |
+| `localMachine.sh` | your laptop |
 
-Run them section by section. Do not run a whole file.
+Run them section by section. Do not run a whole file. Both serve on 8080.
 
 ## 5. Destroy
 
