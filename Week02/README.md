@@ -1,83 +1,101 @@
-# CLO835 — Week 02 lab: one EC2 machine for the manual deployment
+# CLO835 — Week 02: one EC2 machine, deployed by hand
 
-Infrastructure-as-code for **`Week02/Week02.pptx`** (slide 18 — Clone, Create,
-Convert, Build, Test, Publish).
+One Ubuntu 26.04 EC2 machine in the AWS Academy Learner Lab. It has `git` and
+nothing else. Deploy the Flask app on it by hand, then build the same app as a
+container image and compare.
 
-**One Ubuntu 26.04 LTS EC2 machine** on AWS Academy Learner Lab. The machine has
-`git` and nothing else. You deploy the Flask app on it **by hand**, count the
-steps, and then find the same steps inside a `Dockerfile` on your own laptop.
-
-App repository: <https://github.com/sojoudian/simple-webapp-flask>
-
-## What `terraform apply` sets up (≈1 minute)
-
-| Requirement | How this Terraform provides it |
-|---|---|
-| One Linux machine | 1× **`r6i.large`** (2 vCPU / 16 GB), Ubuntu 26.04 LTS, 30 GB gp3 |
-| The same base as the image | Ubuntu **26.04 LTS** (Python 3.14), because the `Dockerfile` says `FROM ubuntu:26.04` |
-| A way in | Security group: **22** (SSH) |
-| A way to see the result | Security group: **8080** (manual run) and **18080** (container run) |
-| The lab steps | [`runAWS_EC2.sh`](runAWS_EC2.sh) on the machine, then [`localMachine.sh`](localMachine.sh) on your laptop |
-| Docker on the machine | **Not installed** — the manual way comes first |
+App: <https://github.com/sojoudian/simple-webapp-flask>
 
 ## Prerequisites
 
-- AWS Academy Learner Lab access — sign in at <https://www.awsacademy.com/vforcesite/LMS_Login>
-- An EC2 **key pair** in the Learner Lab (AWS Console → EC2 → Key Pairs), `.pem` downloaded
-- On your laptop: AWS CLI v2, Terraform, Git, Docker
+- Learner Lab access: <https://www.awsacademy.com/vforcesite/LMS_Login>
+- An EC2 key pair (AWS Console → EC2 → Key Pairs), `.pem` downloaded
+- Laptop: AWS CLI v2, Terraform, Git, Docker
 
-## 1. Get your AWS credentials
+## 1. Credentials
 
-Learner Lab page: **Start Lab** → wait for the green dot → **AWS Details → AWS CLI
-→ Show**. Paste the whole `[default]` block into `~/.aws/credentials`, set
-`region = us-east-1` in `~/.aws/config`. Credentials rotate every session
-(~4 h) — re-paste each session. Verify: `aws sts get-caller-identity`.
+Click **Start Lab** and wait for the dot beside AWS to turn green. Then click
+**AWS Details** at the top. A **Cloud Access** panel opens on the right, with a
+block that starts with `[default]`. Copy the whole block.
 
-## 2. Configure and apply
+Paste it into `~/.aws/credentials`, and replace everything that is already in
+the file.
+
+```bash
+mkdir -p ~/.aws
+nano ~/.aws/credentials
+```
+
+The block looks like this. The three values are different every time.
+
+```ini
+[default]
+aws_access_key_id=ASIA...
+aws_secret_access_key=...
+aws_session_token=...
+```
+
+Set the region once. You do not repeat this step.
+
+```bash
+printf '[default]\nregion = us-east-1\n' > ~/.aws/config
+```
+
+Check it.
+
+```bash
+aws sts get-caller-identity
+```
+
+The session lasts 4 hours. When it ends, or when you click **End Lab**, the
+three values stop working. Copy the block again from **AWS Details**.
+
+## 2. Apply
 
 ```bash
 cd Week02
-cp terraform.tfvars.example terraform.tfvars   # set key_name to YOUR key pair
+cp terraform.tfvars.example terraform.tfvars   # set key_name
 chmod 400 your-key.pem
 
 terraform init
-terraform apply        # type yes; wait ~1 min
+terraform apply
 ```
 
-## 3. Connect, then run the lab
+Takes about a minute. Terraform asks for `key_name` if `terraform.tfvars` does
+not set it.
+
+## 3. Connect
 
 ```bash
-terraform output                     # public_ip, private_ip, urls, next_step
-
-ssh -i your-key.pem ubuntu@<public IP from terraform output>
-git --version                        # the only tool that is ready
+terraform output                     # public_ip, private_ip, urls
+ssh -i your-key.pem ubuntu@<public_ip>
 ```
 
-Then follow the two scripts, section by section, next to the slides.
+The Learner Lab stops the machine between sessions, and the address changes. Run
+`terraform refresh` before `terraform output`.
 
-| Script | Where you run it | What it does |
-|---|---|---|
-| [`runAWS_EC2.sh`](runAWS_EC2.sh) | on the EC2 machine | The manual way: clone, install Python, hit the PEP 668 error, fix it with a venv, run on **8080**. |
-| [`localMachine.sh`](localMachine.sh) | on your own laptop | The container way: read the Dockerfile, build, run on **18080**, tag, push. |
+## 4. The lab
 
-The Learner Lab stops the machine between sessions and AWS gives a new public
-address at the next start. Run `terraform refresh` before `terraform output`.
+| Script | Run it on | Port |
+|---|---|--:|
+| `runAWS_EC2.sh` | the EC2 machine | 8080 |
+| `localMachine.sh` | your laptop | 18080 |
 
-## The two ports
+Run them section by section, next to the slides. Do not run a whole file.
 
-| How you run it | Port | Source |
-|---|--:|---|
-| `python3 app.py` | 8080 | `app.py` default, when `PORT` is absent |
-| `docker run` | 18080 | `Dockerfile`: `ENV PORT=18080`, `EXPOSE 18080` |
+The app reads `PORT`. It uses 8080 when `PORT` is absent. The Dockerfile sets
+`ENV PORT=18080`. The security group opens 22, 8080, and 18080.
 
-Both run the same command. One environment variable sets the port, so the code
-never changes. This Terraform opens both ports.
-
-## 4. Destroy
+## 5. Destroy
 
 ```bash
 terraform destroy
 ```
 
-Run it at the end of each class. A stopped machine still pays for the 30 GB disk.
-One 4-hour session costs roughly 0.55 USD.
+Run it at the end of class. A stopped machine still pays for the disk.
+
+## Notes
+
+- `r6i.large`, 2 vCPU, 16 GB. The Learner Lab blocks `xlarge` and larger.
+- Ubuntu 26.04 matches `FROM ubuntu:26.04` in the Dockerfile.
+- SSH is open to `0.0.0.0/0`. The image takes a key only, not a password.
