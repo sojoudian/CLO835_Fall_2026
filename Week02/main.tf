@@ -83,7 +83,7 @@ resource "aws_security_group_rule" "egress" {
 ########################################################
 resource "aws_instance" "vm" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "r6i.large" # 2 vCPU / 16 GB (the Learner Lab blocks xlarge and larger)
+  instance_type          = "r5.large" # 2 vCPU / 16 GB (the Learner Lab blocks xlarge and larger, and newer generations such as r6i)
   key_name               = var.key_name
   subnet_id              = local.lab_subnet_id
   vpc_security_group_ids = [aws_security_group.vm.id]
