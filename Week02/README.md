@@ -29,8 +29,6 @@ aws sts get-caller-identity
 
 ```bash
 cd Week02
-chmod 400 your-key.pem
-
 terraform init
 terraform apply        # asks for key_name
 ```
@@ -39,6 +37,7 @@ terraform apply        # asks for key_name
 
 ```bash
 terraform output
+chmod 400 your-key.pem               # ssh refuses a key that others can read
 ssh -i your-key.pem ubuntu@<public_ip>
 ```
 
