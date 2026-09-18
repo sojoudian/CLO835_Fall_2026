@@ -14,65 +14,36 @@ App: <https://github.com/sojoudian/simple-webapp-flask>
 
 ## 1. Credentials
 
-Click **Start Lab** and wait for the dot beside AWS to turn green. Then click
-**AWS Details** at the top. A **Cloud Access** panel opens on the right, with a
-block that starts with `[default]`. Copy the whole block.
-
-Paste it into `~/.aws/credentials`, and replace everything that is already in
-the file.
+Click **Start Lab**, wait for the green dot, then click **AWS Details**. Copy the
+`[default]` block from the Cloud Access panel into `~/.aws/credentials`. It
+expires after 4 hours.
 
 ```bash
 mkdir -p ~/.aws
 vi ~/.aws/credentials
-```
-
-The block looks like this. The three values are different every time.
-
-```ini
-[default]
-aws_access_key_id=ASIA...
-aws_secret_access_key=...
-aws_session_token=...
-```
-
-Set the region once. You do not repeat this step.
-
-```bash
 printf '[default]\nregion = us-east-1\n' > ~/.aws/config
-```
-
-Check it.
-
-```bash
 aws sts get-caller-identity
 ```
-
-The session lasts 4 hours. When it ends, or when you click **End Lab**, the
-three values stop working. Copy the block again from **AWS Details**.
 
 ## 2. Apply
 
 ```bash
 cd Week02
-cp terraform.tfvars.example terraform.tfvars   # set key_name
 chmod 400 your-key.pem
 
 terraform init
-terraform apply
+terraform apply        # asks for key_name
 ```
-
-Takes about a minute. Terraform asks for `key_name` if `terraform.tfvars` does
-not set it.
 
 ## 3. Connect
 
 ```bash
-terraform output                     # public_ip, private_ip, urls
+terraform output
 ssh -i your-key.pem ubuntu@<public_ip>
 ```
 
-The Learner Lab stops the machine between sessions, and the address changes. Run
-`terraform refresh` before `terraform output`.
+The lab stops the machine between sessions, and the address changes. Run
+`terraform refresh` first.
 
 ## 4. The lab
 
@@ -81,10 +52,7 @@ The Learner Lab stops the machine between sessions, and the address changes. Run
 | `runAWS_EC2.sh` | the EC2 machine | 8080 |
 | `localMachine.sh` | your laptop | 18080 |
 
-Run them section by section, next to the slides. Do not run a whole file.
-
-The app reads `PORT`. It uses 8080 when `PORT` is absent. The Dockerfile sets
-`ENV PORT=18080`. The security group opens 22, 8080, and 18080.
+Run them section by section. Do not run a whole file.
 
 ## 5. Destroy
 
@@ -92,10 +60,8 @@ The app reads `PORT`. It uses 8080 when `PORT` is absent. The Dockerfile sets
 terraform destroy
 ```
 
-Run it at the end of class. A stopped machine still pays for the disk.
-
 ## Notes
 
-- `r6i.large`, 2 vCPU, 16 GB. The Learner Lab blocks `xlarge` and larger.
+- `r6i.large`, 2 vCPU, 16 GB. The lab blocks `xlarge` and larger.
 - Ubuntu 26.04 matches `FROM ubuntu:26.04` in the Dockerfile.
-- SSH is open to `0.0.0.0/0`. The image takes a key only, not a password.
+- SSH is open to `0.0.0.0/0`. The image takes a key, not a password.
