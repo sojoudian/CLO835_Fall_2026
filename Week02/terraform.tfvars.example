@@ -1,0 +1,7 @@
+# Copy this file to terraform.tfvars and set your own values.
+#   cp terraform.tfvars.example terraform.tfvars
+
+key_name = "your-keypair-name"
+
+# Usually you do NOT need to change this in the Learner Lab:
+# lab_instance_profile = "LabInstanceProfile"
