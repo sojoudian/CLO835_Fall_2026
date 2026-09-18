@@ -23,7 +23,7 @@ the file.
 
 ```bash
 mkdir -p ~/.aws
-nano ~/.aws/credentials
+vi ~/.aws/credentials
 ```
 
 The block looks like this. The three values are different every time.
