@@ -20,31 +20,19 @@ sudo apt-get install -y python3 python3-venv
 python3 --version                    # 3.14.4 on Ubuntu 26.04
 
 ########################################################
-# 3) Try the old way - it FAILS twice
-########################################################
-pip3 install flask
-# Command 'pip3' not found. Ubuntu 26.04 ships no pip at all.
-#
-# Install it, then try again:
-sudo apt-get install -y python3-pip
-pip3 install flask
-# error: externally-managed-environment
-# Ubuntu 24.04 and later protect the system Python (PEP 668).
-
-########################################################
-# 4) Install Flask - the correct way
+# 3) Install Flask - the correct way
 ########################################################
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt      # Flask==3.1.3
 
 ########################################################
-# 5) Run
+# 4) Run
 ########################################################
 python3 app.py                       # app.py uses 8080 when PORT is not set
 
 ########################################################
-# 6) Test
+# 5) Test
 ########################################################
 # From a second SSH session:
 curl http://localhost:8080/          # Welcome CLO835!
@@ -52,9 +40,9 @@ curl http://localhost:8080/          # Welcome CLO835!
 #   http://<PUBLIC-IP>:8080/
 
 ########################################################
-# 7) Ask the class
+# 6) Ask the class
 ########################################################
-# - How do you repeat these 6 steps on a second machine?
+# - How do you repeat these steps on a second machine?
 # - How do you move this result to another computer?
 # - What stays on the machine after you stop the app?
 # - What breaks on a different Ubuntu version?
