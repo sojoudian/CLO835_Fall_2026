@@ -58,9 +58,17 @@ docker run -d \
     adminer:latest
 
 # 2. prove DNS works from inside the network
+#    The trailing dot matters. On EC2 the DHCP search domain is ec2.internal,
+#    and busybox nslookup appends it first, so "mysql-db" alone reports
+#    NXDOMAIN even though the name resolves. The dot stops the search.
 docker run --rm \
     --network clo835-net \
-    alpine nslookup mysql-db
+    alpine nslookup mysql-db.
+
+#    A second proof that never needs the dot:
+docker run --rm \
+    --network clo835-net \
+    alpine getent hosts mysql-db
 
 # 3. open the Adminer UI
 #    Browser -> http://localhost:8080
