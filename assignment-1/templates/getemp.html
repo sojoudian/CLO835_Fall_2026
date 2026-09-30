@@ -1,0 +1,27 @@
+	<!DOCTYPE html>
+<html>
+<head>
+	<title>Get Employee Information</title>
+</head>
+<center>
+	<font color="black" size="5" style="font-family: avenir">
+
+		<h1 style="color: DodgerBlue">Employee Information</h1>
+
+		<body style="background: {{ color }};">
+
+			<form action="/fetchdata" autocomplete="on" method="POST">
+
+				<h2 style="color: grey">Enter Employee ID</h2>
+
+		  		Employee ID:<br> <input style="height:25px;font-size:14pt;" type="number" name="emp_id" autofocus size="40"><br><br>
+
+
+		  		<button type="submit" style="background: grey; height: 45px; width: 200px; color: white; size: 5; font:oblique;">FETCH INFO</button><br><br>
+
+			</form>
+
+		</body>
+	</font>
+</center>
+</html>
