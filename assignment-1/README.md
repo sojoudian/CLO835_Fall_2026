@@ -86,6 +86,25 @@ docker exec blue ping -c 2 lime
 | `DATABASE` | `employees` | the database name |
 | `APP_COLOR` | `lime` | `blue`, `pink` or `lime` |
 
+## The whole stack in one command
+
+`compose.yaml` defines all four services. Compose makes the bridge network for
+you, so `DBHOST` is simply the service name `mysql-db`.
+
+```bash
+docker compose up -d
+docker compose ps
+curl http://localhost:8081
+curl http://localhost:8082
+curl http://localhost:8083
+```
+
+Stop it and delete the volume.
+
+```bash
+docker compose down -v
+```
+
 ## Clean up
 
 ```bash
