@@ -17,7 +17,7 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-# Default VPC + one subnet. The Learner Lab does not permit a new VPC.
+# Default VPC. The Learner Lab does not permit a new VPC.
 data "aws_vpc" "default" {
   default = true
 }
@@ -34,8 +34,7 @@ data "aws_subnet" "each" {
   id       = each.value
 }
 
-# Not every zone offers every instance type. us-east-1e offers neither
-# m5.large nor r5.large, so a fixed subnet choice can fail at launch.
+# Not every zone offers every instance type. us-east-1e offers no m5.large.
 data "aws_ec2_instance_type_offerings" "for_type" {
   location_type = "availability-zone"
 
@@ -50,26 +49,80 @@ locals {
   # stops newer generations such as r6i a few seconds after launch.
   instance_type = "m5.large"
 
+  # All three nodes share ONE subnet and ONE availability zone. kubeadm and
+  # Flannel expect flat, low-latency connectivity between the nodes.
   good_zones = toset(data.aws_ec2_instance_type_offerings.for_type.locations)
-
   lab_subnet_id = sort([
     for s in data.aws_subnet.each : s.id
     if contains(local.good_zones, s.availability_zone)
   ])[0]
+
+  # kubeadm bootstrap token, shared by the master (--token) and the workers
+  # (--token). The workers join without copying anything from the master.
+  # Format: 6 chars "." 16 chars, lowercase letters and digits. Lab only.
+  k8s_token = "week04.0123456789abcdef"
 }
 
 ########################################################
-# Security group
+# Security groups
 ########################################################
-resource "aws_security_group" "vm" {
-  name        = "week04-kind-lab"
-  description = "Week04 kind cluster lab"
+resource "aws_security_group" "master" {
+  name        = "week04-k8s-master"
+  description = "Week04 Kubernetes control-plane node"
   vpc_id      = data.aws_vpc.default.id
 }
 
-resource "aws_security_group_rule" "ssh" {
+resource "aws_security_group" "worker" {
+  name        = "week04-k8s-worker"
+  description = "Week04 Kubernetes worker nodes"
+  vpc_id      = data.aws_vpc.default.id
+}
+
+# --- Node to node: allow ALL traffic between the cluster nodes ---
+# This covers every component port without listing each one:
+#   etcd 2379-2380, kubelet 10250, kube-scheduler 10259,
+#   kube-controller-manager 10257, kube-proxy 10256,
+#   API 6443 node to node, Flannel VXLAN 8472/UDP.
+resource "aws_security_group_rule" "master_from_self" {
   type              = "ingress"
-  security_group_id = aws_security_group.vm.id
+  security_group_id = aws_security_group.master.id
+  self              = true
+  protocol          = "-1"
+  from_port         = 0
+  to_port           = 0
+}
+
+resource "aws_security_group_rule" "master_from_worker" {
+  type                     = "ingress"
+  security_group_id        = aws_security_group.master.id
+  source_security_group_id = aws_security_group.worker.id
+  protocol                 = "-1"
+  from_port                = 0
+  to_port                  = 0
+}
+
+resource "aws_security_group_rule" "worker_from_self" {
+  type              = "ingress"
+  security_group_id = aws_security_group.worker.id
+  self              = true
+  protocol          = "-1"
+  from_port         = 0
+  to_port           = 0
+}
+
+resource "aws_security_group_rule" "worker_from_master" {
+  type                     = "ingress"
+  security_group_id        = aws_security_group.worker.id
+  source_security_group_id = aws_security_group.master.id
+  protocol                 = "-1"
+  from_port                = 0
+  to_port                  = 0
+}
+
+# --- From the internet ---
+resource "aws_security_group_rule" "master_ssh" {
+  type              = "ingress"
+  security_group_id = aws_security_group.master.id
   description       = "SSH"
   protocol          = "tcp"
   from_port         = 22
@@ -77,20 +130,60 @@ resource "aws_security_group_rule" "ssh" {
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
-resource "aws_security_group_rule" "app_manual" {
+resource "aws_security_group_rule" "master_api" {
   type              = "ingress"
-  security_group_id = aws_security_group.vm.id
-  description       = "NodePort 30000"
+  security_group_id = aws_security_group.master.id
+  description       = "Kubernetes API server"
   protocol          = "tcp"
-  from_port         = 30000
-  to_port           = 30001
+  from_port         = 6443
+  to_port           = 6443
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
+resource "aws_security_group_rule" "worker_ssh" {
+  type              = "ingress"
+  security_group_id = aws_security_group.worker.id
+  description       = "SSH"
+  protocol          = "tcp"
+  from_port         = 22
+  to_port           = 22
+  cidr_blocks       = ["0.0.0.0/0"]
+}
 
-resource "aws_security_group_rule" "egress" {
+# A NodePort Service opens its port on EVERY node, so open the range on both.
+resource "aws_security_group_rule" "master_nodeport" {
+  type              = "ingress"
+  security_group_id = aws_security_group.master.id
+  description       = "NodePort Services"
+  protocol          = "tcp"
+  from_port         = 30000
+  to_port           = 32767
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "worker_nodeport" {
+  type              = "ingress"
+  security_group_id = aws_security_group.worker.id
+  description       = "NodePort Services"
+  protocol          = "tcp"
+  from_port         = 30000
+  to_port           = 32767
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+# --- Egress: allow all, on both ---
+resource "aws_security_group_rule" "master_egress" {
   type              = "egress"
-  security_group_id = aws_security_group.vm.id
+  security_group_id = aws_security_group.master.id
+  protocol          = "-1"
+  from_port         = 0
+  to_port           = 0
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "worker_egress" {
+  type              = "egress"
+  security_group_id = aws_security_group.worker.id
   protocol          = "-1"
   from_port         = 0
   to_port           = 0
@@ -98,17 +191,18 @@ resource "aws_security_group_rule" "egress" {
 }
 
 ########################################################
-# Instance: ONE machine for the Week 04 kind lab.
+# Instances: 1 master + 2 workers.
 #
-# bootstrap.sh installs Docker Engine, kind and kubectl. kind runs the whole
-# Kubernetes control plane inside a Docker container on this machine.
+# The cluster forms itself at boot. bootstrap.sh installs the kubeadm
+# prerequisites on every node. The master then runs kubeadm init and installs
+# Flannel. Each worker retries kubeadm join until the API answers.
 ########################################################
-resource "aws_instance" "vm" {
+resource "aws_instance" "master" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = local.instance_type
   key_name               = var.key_name
   subnet_id              = local.lab_subnet_id
-  vpc_security_group_ids = [aws_security_group.vm.id]
+  vpc_security_group_ids = [aws_security_group.master.id]
   iam_instance_profile   = var.lab_instance_profile
 
   metadata_options {
@@ -121,25 +215,63 @@ resource "aws_instance" "vm" {
     volume_type = "gp3"
   }
 
-  user_data = file("${path.module}/bootstrap.sh")
+  user_data = "${file("${path.module}/bootstrap.sh")}\n${templatefile("${path.module}/master-init.sh.tftpl", {
+    k8s_token = local.k8s_token
+  })}"
 
   tags = {
-    Name = "week04-kind-lab"
+    Name = "week04-k8s-master"
   }
 }
 
-output "public_ip" {
-  value = aws_instance.vm.public_ip
+resource "aws_instance" "worker" {
+  count                  = 2
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = local.instance_type
+  key_name               = var.key_name
+  subnet_id              = local.lab_subnet_id
+  vpc_security_group_ids = [aws_security_group.worker.id]
+  iam_instance_profile   = var.lab_instance_profile
+
+  metadata_options {
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+
+  root_block_device {
+    volume_size = 30
+    volume_type = "gp3"
+  }
+
+  user_data = "${file("${path.module}/bootstrap.sh")}\n${templatefile("${path.module}/worker-join.sh.tftpl", {
+    k8s_token = local.k8s_token
+    master_ip = aws_instance.master.private_ip
+    node_name = "workernode${count.index + 1}"
+  })}"
+
+  tags = {
+    Name = "week04-k8s-worker-${count.index + 1}"
+  }
 }
 
-output "private_ip" {
-  value = aws_instance.vm.private_ip
+output "public_ips" {
+  value = merge(
+    { master = aws_instance.master.public_ip },
+    { for i, w in aws_instance.worker : "worker-${i + 1}" => w.public_ip }
+  )
+}
+
+output "private_ips" {
+  value = merge(
+    { master = aws_instance.master.private_ip },
+    { for i, w in aws_instance.worker : "worker-${i + 1}" => w.private_ip }
+  )
 }
 
 output "next_step" {
-  value = "ssh -i <your-key.pem> ubuntu@${aws_instance.vm.public_ip}   # then follow localMachine.sh"
+  value = "ssh -i <your-key.pem> ubuntu@${aws_instance.master.public_ip}   # then: kubectl get nodes"
 }
 
 output "nodeport_url" {
-  value = "http://${aws_instance.vm.public_ip}:30000/"
+  value = "http://${aws_instance.master.public_ip}:30000/"
 }

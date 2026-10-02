@@ -1,0 +1,21 @@
+
+# === Worker join. This is appended after bootstrap.sh and runs as root. ===
+
+# Set the hostname first. kubeadm uses it as the Kubernetes node name.
+hostnamectl set-hostname ${node_name}
+echo "127.0.0.1 ${node_name}" >> /etc/hosts
+
+# Retry until the control plane answers. The master may still be running
+# kubeadm init when this node is ready.
+until kubeadm join ${master_ip}:6443 --token=${k8s_token} --discovery-token-unsafe-skip-ca-verification; do
+  echo "Control plane not reachable yet; retrying in 15s..."
+  sleep 15
+done
+
+cat > /etc/motd <<'MOTD'
+
+  CLO835 - Week 04 - Kubernetes with kubeadm
+  ------------------------------------------
+  You are on a WORKER node. Run kubectl on the master, not here.
+
+MOTD
