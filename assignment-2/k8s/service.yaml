@@ -1,0 +1,21 @@
+# TODO: a Service that publishes YOUR app so a browser can reach it.
+#
+# Requirements for this assignment:
+#   - type must be NodePort. A ClusterIP Service answers inside the cluster
+#     only, so your browser cannot reach it.
+#   - pin nodePort to 30000. Terraform opens 30000-32767 on every node.
+#   - the selector must match the Pod labels of your Deployment.
+#
+# Docs: https://kubernetes.io/docs/concepts/services-networking/service/
+apiVersion: v1
+kind: Service
+metadata:
+  name: # TODO
+spec:
+  type: # TODO  (see the requirement above)
+  selector:
+    app: # TODO  (must match your Deployment's pod labels)
+  ports:
+    - port: 80
+      targetPort: 8080
+      nodePort: # TODO  (30000)

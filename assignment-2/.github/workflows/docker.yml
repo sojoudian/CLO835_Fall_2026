@@ -1,0 +1,25 @@
+# TODO: build your image and push it to Docker Hub on every push to your
+# default branch.
+#
+# Use the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN.
+# Do NOT write a password or a token in this file.
+#
+# The Kubernetes nodes are x86_64, so build for linux/amd64.
+name: Build and Push to Docker Hub
+
+on:
+  push:
+    # GitHub names the first branch "main". The course repository uses
+    # "master". Both names are here, so the pipeline runs either way.
+    branches: [ master, main ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      # TODO: check out the code
+      # TODO: log in to Docker Hub with the two secrets
+      # TODO: build from your Dockerfile and push the image,
+      #       for platform linux/amd64,
+      #       tagged with the app version (for example 0.2) AND the commit SHA
+      - run: echo "TODO: replace this step with your build-and-push steps"

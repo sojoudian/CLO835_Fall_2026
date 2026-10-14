@@ -1,0 +1,8 @@
+[package]
+name = "clo835-assignment2"
+version = "0.2.0"
+edition = "2024"
+
+[[bin]]
+name = "server"
+path = "src/main.rs"

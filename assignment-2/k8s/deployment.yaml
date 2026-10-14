@@ -1,0 +1,28 @@
+# TODO: a Deployment that runs 3 replicas of YOUR image.
+#
+# Requirements for this assignment:
+#   - replicas must be 3.
+#   - the container serves on port 8080.
+#   - the image must come from Docker Hub, built by your pipeline.
+#   - the selector must match the labels in the Pod template.
+#
+# Docs: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: # TODO
+spec:
+  replicas: # TODO  (3)
+  selector:
+    matchLabels:
+      app: # TODO
+  template:
+    metadata:
+      labels:
+        app: # TODO
+    spec:
+      containers:
+        - name: # TODO
+          image: # TODO  e.g. <your-dockerhub-username>/<repo>:0.2
+          ports:
+            - containerPort: 8080
