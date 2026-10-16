@@ -1,0 +1,16 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+terraform.tfvars
+*.tfplan
+crash.log
+
+# Keys / secrets — never commit these
+*.pem
+*.ppk
+credentials
+
+# OS
+.DS_Store
