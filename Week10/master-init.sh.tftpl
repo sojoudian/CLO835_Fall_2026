@@ -1,0 +1,85 @@
+
+# === Control-plane init. This is appended after bootstrap.sh and runs as root. ===
+
+# Set the hostname first. kubeadm uses it as the Kubernetes node name.
+hostnamectl set-hostname masternode
+echo "127.0.0.1 masternode" >> /etc/hosts
+
+IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
+
+kubeadm init \
+  --token=${k8s_token} \
+  --token-ttl=0 \
+  --pod-network-cidr=10.244.0.0/16 \
+  --apiserver-advertise-address="$PRIVATE_IP" \
+  --apiserver-cert-extra-sans="$PUBLIC_IP"
+
+# kubeconfig for the ubuntu user, so kubectl works right after you SSH in.
+mkdir -p /home/ubuntu/.kube
+cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+chown -R ubuntu:ubuntu /home/ubuntu/.kube
+
+export KUBECONFIG=/etc/kubernetes/admin.conf
+
+# The API server drops connections for a moment right after init, and again
+# when Flannel reconfigures the network. One failed kubectl under "set -e"
+# would kill this whole script, so the apply retries until it sticks.
+until kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml; do
+  echo "Flannel apply failed; retrying in 10s..."
+  sleep 10
+done
+
+# Label the workers as they join. This runs in the background, so cloud-init
+# is not blocked while it waits.
+nohup bash -c '
+  for i in $(seq 1 60); do
+    for node in $(kubectl get nodes -l "!node-role.kubernetes.io/control-plane" -o name 2>/dev/null); do
+      kubectl label "$node" node-role.kubernetes.io/worker="" --overwrite >/dev/null 2>&1
+    done
+    sleep 15
+  done
+' >/var/log/label-workers.log 2>&1 &
+
+# The last step of localMachine.sh calls ./cleanup_lab10.sh. The student runs
+# terraform on their own laptop, so that file never reaches this node. Write it
+# here, so the last step of the lab works with no copying.
+cat > /home/ubuntu/cleanup_lab10.sh <<'CLEANUP'
+#!/bin/bash
+# CLO835 - Lab 10 - remove everything the lab creates inside the cluster.
+# The three machines are removed by "terraform destroy" on your own laptop.
+set -uo pipefail
+
+pkill -f "kubectl proxy" 2>/dev/null
+kubectl delete pod writer dnstest --now 2>/dev/null
+kubectl delete statefulset kubia 2>/dev/null
+kubectl delete service kubia 2>/dev/null
+kubectl delete pvc data-pvc data-kubia-0 data-kubia-1 2>/dev/null
+kubectl delete pv data-pv 2>/dev/null
+# The provisioner deletes the PVs of the pets. Wait for that, then remove the provisioner.
+for i in $(seq 30); do [ -z "$(kubectl get pv -o name)" ] && break; sleep 2; done
+kubectl delete storageclass standard 2>/dev/null
+kubectl delete namespace local-path-storage 2>/dev/null
+kubectl delete clusterrolebinding local-path-provisioner-bind 2>/dev/null
+kubectl delete clusterrole local-path-provisioner-role 2>/dev/null
+rm -f ./pv-pvc.yaml ./writer.yaml ./kubia-statefulset.yaml
+
+kubectl get pods,pvc,pv
+
+echo "done"
+CLEANUP
+chmod +x /home/ubuntu/cleanup_lab10.sh
+chown ubuntu:ubuntu /home/ubuntu/cleanup_lab10.sh
+
+cat > /etc/motd <<'MOTD'
+
+  CLO835 - Week 10 - PersistentVolumes, StorageClasses and StatefulSets
+  ---------------------------------------------------------------------
+  You are on the CONTROL PLANE node. kubectl is ready.
+  The two workers join by themselves. Give them a few minutes.
+
+  Check first:   kubectl get nodes -o wide
+  Then follow:   localMachine.sh, step by step.
+
+MOTD

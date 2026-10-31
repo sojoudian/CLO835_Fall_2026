@@ -19,7 +19,7 @@ kubeadm init \
 # kubeconfig for the ubuntu user, so kubectl works right after you SSH in.
 mkdir -p /home/ubuntu/.kube
 cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
-chown ubuntu:ubuntu /home/ubuntu/.kube/config
+chown -R ubuntu:ubuntu /home/ubuntu/.kube
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
@@ -51,14 +51,13 @@ cat > /home/ubuntu/cleanup_lab06.sh <<'CLEANUP'
 # The three machines are removed by "terraform destroy" on your own laptop.
 set -uo pipefail
 
-kubectl delete ingress kubia 2>/dev/null
-kubectl delete service kubia kubia-v2 kubia-nodeport kubia-lb 2>/dev/null
+kubectl delete service kubia kubia-nodeport 2>/dev/null
 kubectl delete deployment kubia 2>/dev/null
-kubectl delete pod kubia-manual kubia-manual-v2 client 2>/dev/null
-kubectl delete pod -l app=kubia-debug 2>/dev/null
-rm -f ./deployment.yaml ./pods-with-labels.yaml ./service.yaml ./service-nodeport.yaml ./ingress.yaml
+kubectl delete pod client --now 2>/dev/null
+kubectl delete pod -l app=kubia-debug --now 2>/dev/null
+rm -f ./deployment.yaml ./service.yaml ./service-nodeport.yaml
 
-kubectl get all,ingress | grep -E "kubia|client"
+kubectl get all | grep -E "kubia|client"
 
 echo "done"
 CLEANUP
