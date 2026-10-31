@@ -1,5 +1,5 @@
 #!/bin/bash
-# CLO835 - Lab 9 - remove everything the lab creates inside the cluster.
+# CLO835 - Lab Week 09 - remove everything the lab creates inside the cluster.
 # The three machines are removed by "terraform destroy" on your own laptop.
 set -uo pipefail
 

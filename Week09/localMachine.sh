@@ -6,7 +6,7 @@
 # itself at boot, the same way it did in Weeks 04 to 07. The lecture teaches
 # what Amazon EKS runs for you. This lab does those jobs by hand.
 #
-# Each step matches one slide of Lab_week09_v2.pptx.
+# Each step matches one slide of Lab_week09_v4.pptx.
 
 ########################################################
 # Step 0 - check the cluster                    (slide 3)
@@ -61,9 +61,13 @@ kubectl wait --for=condition=Ready pod/no-scheduler --timeout=120s
 kubectl get pod no-scheduler -o wide                           # Running on a worker
 
 ########################################################
-# Step 4 - Certificates, upgrades and new nodes are your job (slide 7)
+# Step 4 - Identity, certificates, upgrades and new nodes are your job (slide 7)
 ########################################################
-# kubeadm made the certificates of the cluster. They expire one year after kubeadm init.
+# On EKS, IAM identifies you, and RBAC sets what you can do. Here a certificate identifies you.
+kubectl auth whoami
+kubectl auth can-i delete nodes                    # yes. Ignore the namespace warning.
+
+# kubeadm made the certificates. Each one expires after one year. Each CA expires after 10 years.
 sudo kubeadm certs check-expiration
 
 # EKS upgrades the control plane for you. Here you plan the upgrade yourself.
@@ -74,12 +78,18 @@ sudo kubeadm upgrade plan 2>&1 | tail -15
 sudo kubeadm token create --print-join-command
 # kubeadm join 172.31.x.x:6443 --token ... --discovery-token-ca-cert-hash sha256:...
 
+# On EKS, a CSI driver add-on creates the volumes. This cluster has no CSI driver.
+kubectl get csidrivers,storageclass                # No resources found
+
 ########################################################
 # Step 5 - Drain a node, as AWS does for a managed node group (slide 8)
 ########################################################
 kubectl create deployment kubia --image=maziar/kubia:v1 --replicas=4
 kubectl rollout status deployment/kubia
-kubectl get pods -l app=kubia -o wide             # spread over both workers
+kubectl get pods -l app=kubia -o wide             # both workers, Pod IP 10.244.x.x
+
+# On EKS, the VPC CNI gives each Pod a VPC address. Here Flannel gives an overlay address.
+kubectl get nodes -o wide                         # INTERNAL-IP 172.31.x.x
 
 # Maintenance on workernode2: stop new Pods there, then move its Pods away.
 kubectl cordon workernode2
@@ -100,7 +110,10 @@ bash cleanup_lab09.sh
 # Confirm that nothing is left.
 kubectl get pods,deployments | grep -E 'kubia|no-scheduler'
 
-# ON YOUR OWN MACHINE - remove the three EC2 machines.
+# eksctl creates CloudFormation stacks. Here Terraform created 15 resources. A data line is a read.
+# ON YOUR OWN MACHINE - list the objects, then remove the three EC2 machines.
+# ON YOUR OWN MACHINE:  terraform state list
 # ON YOUR OWN MACHINE:  terraform destroy          # asks for key_name again
 
+# EKS bills 0.10 USD per hour for each control plane. Here you pay for the EC2 machines only.
 # Always destroy. The Learner Lab budget is small.
