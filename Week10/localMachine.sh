@@ -5,7 +5,7 @@
 # Terraform builds 3 machines: 1 control plane and 2 workers. The cluster forms
 # itself at boot, the same way it did in Weeks 04 to 09.
 #
-# Each step matches one slide of Lab_week10_v2.pptx.
+# Each step matches one slide of Lab_week10_v3.pptx.
 
 ########################################################
 # Step 0 - check the cluster                    (slide 3)
@@ -68,7 +68,7 @@ metadata:
 spec:
   containers:
   - name: shell
-    image: busybox:1.36
+    image: maziar/alpine-curl
     command: ["sleep", "3600"]
     volumeMounts:
     - name: data
@@ -93,8 +93,8 @@ kubectl exec writer -- cat /data/note.txt
 # Step 3 - A StorageClass provisions the volumes (slide 6)
 ########################################################
 # On EKS, the EBS CSI driver makes a disk for each claim. Here the local-path
-# provisioner of the course repository makes a folder on a node.
-kubectl apply -f https://raw.githubusercontent.com/sojoudian/CLO835_Fall_2026/master/Week10/local-path-storage.yaml
+# provisioner makes a folder on a node. The master holds its manifest.
+kubectl apply -f local-path-storage.yaml
 kubectl -n local-path-storage rollout status deployment/local-path-provisioner
 
 # One StorageClass, the default. A claim with no class gets it.
@@ -160,10 +160,14 @@ kubectl delete pod kubia-0
 sleep 5; kubectl wait --for=condition=Ready pod/kubia-0 --timeout=180s
 curl -s localhost:8001/api/v1/namespaces/default/pods/kubia-0/proxy/          # the same data
 
-# The headless Service gives each pet a stable DNS name.
+# The headless Service gives each pet a stable DNS name. The IP address can change.
 kubectl run dnstest --image=maziar/alpine-curl --restart=Never --command -- sleep 3600
 kubectl wait --for=condition=Ready pod/dnstest --timeout=120s
 kubectl exec dnstest -- nslookup kubia-0.kubia.default.svc.cluster.local
+
+# The name of the Service returns all the pets. SRV records name each one: peers use them.
+kubectl exec dnstest -- nslookup kubia.default.svc.cluster.local
+kubectl exec dnstest -- nslookup -type=SRV kubia.default.svc.cluster.local
 
 ########################################################
 # Step 6 - Clean up                             (slide 9)
