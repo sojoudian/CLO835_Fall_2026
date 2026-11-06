@@ -1,0 +1,77 @@
+
+# === Control-plane init. This is appended after bootstrap.sh and runs as root. ===
+
+# Set the hostname first. kubeadm uses it as the Kubernetes node name.
+hostnamectl set-hostname masternode
+echo "127.0.0.1 masternode" >> /etc/hosts
+
+IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
+
+kubeadm init \
+  --token=${k8s_token} \
+  --token-ttl=0 \
+  --pod-network-cidr=10.244.0.0/16 \
+  --apiserver-advertise-address="$PRIVATE_IP" \
+  --apiserver-cert-extra-sans="$PUBLIC_IP"
+
+# kubeconfig for the ubuntu user, so kubectl works right after you SSH in.
+mkdir -p /home/ubuntu/.kube
+cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+chown ubuntu:ubuntu /home/ubuntu/.kube/config
+
+export KUBECONFIG=/etc/kubernetes/admin.conf
+
+# The API server drops connections for a moment right after init, and again
+# when Flannel reconfigures the network. One failed kubectl under "set -e"
+# would kill this whole script, so the apply retries until it sticks.
+until kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml; do
+  echo "Flannel apply failed; retrying in 10s..."
+  sleep 10
+done
+
+# Label the workers as they join. This runs in the background, so cloud-init
+# is not blocked while it waits.
+nohup bash -c '
+  for i in $(seq 1 60); do
+    for node in $(kubectl get nodes -l "!node-role.kubernetes.io/control-plane" -o name 2>/dev/null); do
+      kubectl label "$node" node-role.kubernetes.io/worker="" --overwrite >/dev/null 2>&1
+    done
+    sleep 15
+  done
+' >/var/log/label-workers.log 2>&1 &
+
+# Step 13 of localMachine.sh calls ./cleanup_lab05.sh. The student runs
+# terraform on their own laptop, so that file never reaches this node. Write it
+# here, so the last step of the lab works with no copying.
+cat > /home/ubuntu/cleanup_lab05.sh <<'CLEANUP'
+#!/bin/bash
+# CLO835 - Lab 5 - remove everything the lab creates inside the cluster.
+# The three machines are removed by "terraform destroy" on your own laptop.
+set -uo pipefail
+
+kubectl delete service nginx-http 2>/dev/null
+kubectl delete rs kubia-rs 2>/dev/null
+kubectl delete pod nginx kubia pingpong web-with-sidecar 2>/dev/null
+kubectl delete namespace pingpong 2>/dev/null
+rm -f ./kubia-manual.yaml ./sidecar.yaml ./rs.yaml
+
+kubectl get deploy,rs,svc,pods --all-namespaces | grep -E "nginx|kubia|pingpong"
+
+echo "done"
+CLEANUP
+chmod +x /home/ubuntu/cleanup_lab05.sh
+chown ubuntu:ubuntu /home/ubuntu/cleanup_lab05.sh
+
+cat > /etc/motd <<'MOTD'
+
+  CLO835 - Week 05 - Pods, ReplicaSets and Deployments
+  -----------------------------------------------
+  You are on the CONTROL PLANE node. kubectl is ready.
+  The two workers join by themselves. Give them a few minutes.
+
+  Check first:   kubectl get nodes -o wide
+  Then follow:   localMachine.sh, step by step.
+
+MOTD
