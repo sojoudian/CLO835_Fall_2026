@@ -5,7 +5,7 @@
 # Terraform builds 3 machines: 1 control plane and 2 workers. The cluster forms
 # itself at boot, the same way it did in Weeks 04 to 06.
 #
-# Each step matches one slide of Lab_week07_v2.pptx.
+# Each step matches one slide of Lab_week07_v3.pptx.
 
 ########################################################
 # Step 0 - check the cluster                    (slide 3)
@@ -18,7 +18,7 @@ kubectl get pods -n kube-system
 # Step 1 - Two containers share one emptyDir    (slide 4)
 ########################################################
 # html-generator writes a new fortune every 10 s into
-# an emptyDir. nginx serves the same folder.
+# an emptyDir. nginx serves the same directory.
 cat > fortune-pod.yaml <<'EOF'
 apiVersion: v1
 kind: Pod
@@ -53,11 +53,11 @@ kubectl wait --for=condition=Ready pod/fortune --timeout=120s
 POD_IP=$(kubectl get pod fortune -o jsonpath='{.status.podIP}')
 curl -s http://$POD_IP; sleep 10; curl -s http://$POD_IP
 
-# The volume shadows the folder: only the fortune file.
+# The volume hides the old files: only the fortune file.
 kubectl exec fortune -c web-server -- ls /usr/share/nginx/html
 
 ########################################################
-# Step 2 - The volume lives as long as the Pod  (slide 5)
+# Step 2 - An emptyDir lives as long as the Pod (slide 5)
 ########################################################
 # A container restart keeps the volume. Stop nginx: the kubelet starts it again.
 kubectl exec fortune -c web-server -- nginx -s stop
@@ -91,7 +91,8 @@ spec:
     - https://github.com/sojoudian/kubia.git
     - /repo
     volumeMounts:
-    - {name: html, mountPath: /repo}
+    - name: html
+      mountPath: /repo
   containers:
   - image: nginx:alpine
     name: web-server
@@ -113,9 +114,9 @@ GIT_IP=$(kubectl get pod gitrepo-volume-pod \
 curl -s http://$GIT_IP/app.js | head -5
 
 ########################################################
-# Step 4 - hostPath keeps data on one node      (slide 7)
+# Step 4 - hostPath data stays on one node      (slide 7)
 ########################################################
-# A hostPath volume is a folder of the node.
+# A hostPath volume is a directory of the node.
 cat > hostpath-pod.yaml <<'EOF'
 apiVersion: v1
 kind: Pod
@@ -126,7 +127,7 @@ spec:
     kubernetes.io/hostname: workernode1
   containers:
   - name: shell
-    image: busybox:1.36
+    image: maziar/alpine-curl
     command: ["sleep", "3600"]
     volumeMounts:
     - name: node-data
@@ -146,7 +147,7 @@ kubectl delete pod hostpath-pod --now
 kubectl apply -f hostpath-pod.yaml
 kubectl wait --for=condition=Ready pod/hostpath-pod --timeout=60s
 kubectl exec hostpath-pod -- cat /data/note.txt
-# The file outlived the Pod. It stays on workernode1.
+# The file is still there. It stays on workernode1.
 
 ########################################################
 # Step 5 - A PersistentVolumeClaim and a StorageClass (slide 8)
@@ -176,7 +177,7 @@ metadata:
 spec:
   containers:
   - name: shell
-    image: busybox:1.36
+    image: maziar/alpine-curl
     command: ["sleep", "3600"]
     volumeMounts:
     - {name: my-volume, mountPath: /my-data}

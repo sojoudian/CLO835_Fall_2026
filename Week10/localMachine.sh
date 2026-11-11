@@ -5,7 +5,7 @@
 # Terraform builds 3 machines: 1 control plane and 2 workers. The cluster forms
 # itself at boot, the same way it did in Weeks 04 to 09.
 #
-# Each step matches one slide of Lab_week10_v3.pptx.
+# Each step matches one slide of Lab_week10_v4.pptx.
 
 ########################################################
 # Step 0 - check the cluster                    (slide 3)
@@ -17,8 +17,8 @@ kubectl get pods -n kube-system
 ########################################################
 # Step 1 - A PersistentVolume and a claim       (slide 4)
 ########################################################
-# The administrator makes the PV: a folder of
-# workernode1. The user claims it with a PVC.
+# The administrator creates the PV: a directory of
+# workernode1. The user asks for it with a PVC.
 cat > pv-pvc.yaml <<'EOF'
 apiVersion: v1
 kind: PersistentVolume
@@ -53,11 +53,13 @@ kubectl apply -f pv-pvc.yaml
 kubectl wait --for=jsonpath='{.status.phase}'=Bound pvc/data-pvc --timeout=60s
 kubectl get pv,pvc
 
-# Retain: when the claim goes, the PV and its
-# data stay for the administrator.
+# The Events at the end tell why a claim is Pending.
+kubectl describe pvc data-pvc
+# The Events can show an early FailedBinding event.
+# The Status field gives the result: Bound.
 
 ########################################################
-# Step 2 - The data outlives the Pod            (slide 5)
+# Step 2 - The data stays after the Pod and the claim (slide 5)
 ########################################################
 # The Pod names the claim, not the storage.
 cat > writer.yaml <<'EOF'
@@ -89,11 +91,19 @@ kubectl apply -f writer.yaml
 kubectl wait --for=condition=Ready pod/writer --timeout=120s
 kubectl exec writer -- cat /data/note.txt
 
+# Retain: delete the Pod and the claim.
+# The PV and its data stay.
+kubectl delete pod writer --now
+kubectl delete pvc data-pvc
+kubectl get pv data-pv       # STATUS Released
+# CLAIM still names data-pvc, so no new
+# claim can bind to data-pv.
+
 ########################################################
 # Step 3 - A StorageClass provisions the volumes (slide 6)
 ########################################################
-# On EKS, the EBS CSI driver makes a disk for each claim. Here the local-path
-# provisioner makes a folder on a node. The master holds its manifest.
+# On EKS, the EBS CSI driver creates an EBS volume for each claim. Here the local-path
+# provisioner creates a directory on a node. The master holds its manifest.
 kubectl apply -f local-path-storage.yaml
 kubectl -n local-path-storage rollout status deployment/local-path-provisioner
 
@@ -102,16 +112,18 @@ kubectl get storageclass
 # NAME                 PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE
 # standard (default)   rancher.io/local-path   Delete          WaitForFirstConsumer
 
-# WaitForFirstConsumer: the PV is made only when a Pod uses the claim.
+# WaitForFirstConsumer: the provisioner creates the PV only when a Pod uses the claim.
 
 ########################################################
 # Step 4 - A StatefulSet and its headless Service (slide 7)
 ########################################################
-# The headless Service (no ClusterIP) names the pets.
+# Create a headless Service (clusterIP: None). With
+# serviceName in the StatefulSet, the Service gives
+# each Pod a DNS name.
 kubectl create service clusterip kubia --clusterip=None --tcp=80:8080
 
-# Each pet gets a claim from the template, and the
-# StorageClass makes a PV for each claim.
+# Each Pod gets a claim from the template, and
+# the StorageClass creates a PV for each claim.
 cat > kubia-statefulset.yaml <<'EOF'
 apiVersion: apps/v1
 kind: StatefulSet
@@ -142,32 +154,32 @@ spec:
 EOF
 kubectl apply -f kubia-statefulset.yaml
 
-# kubia-0 first, then kubia-1. Each has its own PV.
+# kubia-0 first, then kubia-1. Each has its own claim.
 kubectl rollout status statefulset/kubia --timeout=300s
-kubectl get pods -l app=kubia -o wide
-kubectl get pvc,pv
+kubectl get pods,pvc,pv -o wide
+# data-pv: Retain, Released. The new PVs: Delete, Bound.
 
 ########################################################
-# Step 5 - A pet keeps its name, its data and its DNS name (slide 8)
+# Step 5 - The identity of a Pod and its DNS names (slide 8)
 ########################################################
 # kubectl proxy listens on 8001 and adds your credentials to each request.
 kubectl proxy --port=8001 >/dev/null 2>&1 &
 sleep 2; curl -s -X POST -d 'Hello kubia-0' localhost:8001/api/v1/namespaces/default/pods/kubia-0/proxy/
-curl -s localhost:8001/api/v1/namespaces/default/pods/kubia-0/proxy/
 
-# Delete kubia-0. The StatefulSet makes a new kubia-0 with the same claim.
+# Delete kubia-0. The StatefulSet creates a new kubia-0 with the same claim.
 kubectl delete pod kubia-0
 sleep 5; kubectl wait --for=condition=Ready pod/kubia-0 --timeout=180s
 curl -s localhost:8001/api/v1/namespaces/default/pods/kubia-0/proxy/          # the same data
 
-# The headless Service gives each pet a stable DNS name. The IP address can change.
+# The headless Service gives each Pod a stable DNS name. The IP address can change.
 kubectl run dnstest --image=maziar/alpine-curl --restart=Never --command -- sleep 3600
 kubectl wait --for=condition=Ready pod/dnstest --timeout=120s
 kubectl exec dnstest -- nslookup kubia-0.kubia.default.svc.cluster.local
 
-# The name of the Service returns all the pets. SRV records name each one: peers use them.
+# The name of the Service returns all the Pods. Each SRV record names one Pod.
 kubectl exec dnstest -- nslookup kubia.default.svc.cluster.local
 kubectl exec dnstest -- nslookup -type=SRV kubia.default.svc.cluster.local
+kubectl delete pod dnstest
 
 ########################################################
 # Step 6 - Clean up                             (slide 9)
