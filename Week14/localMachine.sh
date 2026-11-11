@@ -124,15 +124,10 @@ kubectl get pods -l app=php-apache
 kubectl delete pod load-generator --now
 
 ########################################################
-# Step 6 - Clean up                             (slide 9)
+# Step 6 - Destroy the cluster                  (slide 9)
 ########################################################
-# ON THE MASTER - remove the Kubernetes objects and the viewer user.
-bash cleanup_lab14.sh
-
-# Confirm that nothing is left.
-kubectl get hpa,deployments,pods
-
 # ON YOUR OWN MACHINE - remove the three EC2 machines.
+# This also deletes every Kubernetes object and every file of the lab.
 # ON YOUR OWN MACHINE:  terraform destroy          # asks for key_name again
 
 # Always destroy. The Learner Lab budget is small.

@@ -141,15 +141,10 @@ sleep 2; curl -s http://localhost:30000
 # All 3 nodes answer.
 
 ########################################################
-# Step 6 - Clean up                             (slide 9)
+# Step 6 - Destroy the cluster                  (slide 9)
 ########################################################
-# ON THE MASTER - remove the Kubernetes objects.
-bash cleanup_lab06.sh
-
-# Confirm that nothing is left.
-kubectl get all | grep -E 'kubia|client'
-
 # ON YOUR OWN MACHINE - remove the three EC2 machines.
+# This also deletes every Kubernetes object and every file of the lab.
 # ON YOUR OWN MACHINE:  terraform destroy          # asks for key_name again
 
 # Always destroy. The Learner Lab budget is small.

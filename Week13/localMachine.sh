@@ -179,16 +179,10 @@ kubectl create clusterrolebinding pv-test --clusterrole=pv-reader --serviceaccou
 kubectl auth can-i list persistentvolumes -A --as=system:serviceaccount:week13:clo835   # yes
 
 ########################################################
-# Step 6 - Clean up                             (slide 9)
+# Step 6 - Destroy the cluster                  (slide 9)
 ########################################################
-# ON THE MASTER - delete the Kubernetes objects and the kubeconfig entry of dev-user.
-# A CSR, a ClusterRole and a ClusterRoleBinding have no namespace,
-# so the deletion of week13 does not delete them. The script deletes them one by one.
-# The output must show the context kubernetes-admin@kubernetes only.
-# This step takes about 40 seconds.
-bash cleanup_lab13.sh
-
 # ON YOUR OWN MACHINE - destroy the three EC2 instances.
+# This also deletes every Kubernetes object and every file of the lab.
 # ON YOUR OWN MACHINE:  terraform destroy          # asks for key_name again
 
 # Always destroy. The Learner Lab budget is small.

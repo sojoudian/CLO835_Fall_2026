@@ -2,16 +2,25 @@
 # CLO835 - Week 12 - ConfigMaps and Secrets.
 # Run these ON THE MASTER NODE, section by section. Do NOT run the whole file.
 #
-# Terraform builds 3 machines: 1 control plane and 2 workers. The cluster forms
-# itself at boot, the same way it did in Weeks 04 to 10. The objects of the lab
+# Terraform builds 3 machines: 1 master and 2 workers. The cluster forms
+# itself at boot, as in Weeks 04 to 10. The objects of the lab
 # are in the namespaces week12 and week12-dev.
 #
-# Each step matches one slide of Lab_week12_v5.pptx.
+# Each step matches one slide of Lab_week12_v6.pptx.
 
 ########################################################
 # Step 0 - check the cluster                    (slide 3)
 ########################################################
-# All three nodes must reach Ready. The workers take a few minutes to join.
+# ON YOUR OWN MACHINE - get the repo, build 1 master + 2 workers (slide 3).
+# No clone yet? git clone https://github.com/sojoudian/CLO835_Fall_2026.git
+# git reset --hard replaces your local changes in the repo with the files of GitHub.
+# ON YOUR OWN MACHINE:  cd CLO835_Fall_2026 && git fetch && git reset --hard origin/master
+# ON YOUR OWN MACHINE:  cd Week12 && terraform init
+# ON YOUR OWN MACHINE:  terraform apply          # Terraform asks for key_name
+# ON YOUR OWN MACHINE:  terraform output public_ips
+# ON YOUR OWN MACHINE:  terraform output private_ips
+# ON YOUR OWN MACHINE:  ssh -i <your-key>.pem ubuntu@<masternode-public-ip>
+# ON THE MASTER - all three nodes must reach Ready. The workers take a few minutes to join.
 kubectl get nodes -o wide
 kubectl get pods -n kube-system
 
@@ -24,8 +33,7 @@ kubectl create namespace week12
 # The image: ENTRYPOINT ["/bin/fortuneloop.sh"], CMD ["10"].
 # args replaces CMD, and command replaces
 # ENTRYPOINT. This Pod writes a fortune every 2 s.
-# tee writes the file and shows it.
-tee fortune-args.yaml <<'EOF'
+cat > fortune-args.yaml <<'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -43,8 +51,8 @@ sleep 6; kubectl logs fortune-args -n week12 | head -4
 ########################################################
 # Step 2 - Environment variables from a ConfigMap (slide 5)
 ########################################################
-# The ConfigMap keeps the values out of the manifest.
-# --from-file makes one key from a file. The file name is the key.
+# The values stay in the ConfigMap, not in the manifest.
+# --from-file creates one key from a file. The file name is the key.
 printf 'debug' > LOG_LEVEL
 kubectl create configmap app-config -n week12 \
     --from-literal=APP_COLOR=blue --from-literal=APP_MODE=prod \
@@ -52,8 +60,8 @@ kubectl create configmap app-config -n week12 \
 
 # env sets one value. configMapKeyRef reads one key.
 # envFrom injects every key.
-# Kubernetes injects KUBERNETES_SERVICE_HOST for the API server.
-tee config-env.yaml <<'EOF'
+# The kubelet injects KUBERNETES_SERVICE_HOST for the API server.
+cat > config-env.yaml <<'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -78,6 +86,7 @@ spec:
 EOF
 kubectl apply -f config-env.yaml -n week12
 kubectl wait --for=condition=Ready pod/config-env -n week12 --timeout=120s
+# printenv shows one value for each name, in the order of the names.
 kubectl exec config-env -n week12 -- \
     printenv GREETING COLOR APP_COLOR APP_MODE LOG_LEVEL KUBERNETES_SERVICE_HOST
 
@@ -85,7 +94,7 @@ kubectl exec config-env -n week12 -- \
 # Step 3 - A ConfigMap as a volume              (slide 6)
 ########################################################
 # Each key becomes a file in the volume.
-tee config-volume.yaml <<'EOF'
+cat > config-volume.yaml <<'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -109,15 +118,17 @@ kubectl wait --for=condition=Ready pod/config-volume -n week12 --timeout=120s
 kubectl exec config-volume -n week12 -- ls /etc/app-config
 kubectl exec config-volume -n week12 -- cat /etc/app-config/APP_COLOR; echo
 
-# Change the ConfigMap. The kubelet updates the file in about a minute.
+# Change the ConfigMap. The kubelet updates the file within about one minute.
 # An environment variable gets its value when the container starts.
 # It does not change while the container runs.
 kubectl patch configmap app-config -n week12 -p '{"data":{"APP_COLOR":"green"}}'
-sleep 120; kubectl exec config-volume -n week12 -- cat /etc/app-config/APP_COLOR; echo
+# Wait until the file shows green.
+until kubectl exec config-volume -n week12 -- \
+    cat /etc/app-config/APP_COLOR | grep green; do sleep 5; done
 kubectl exec config-env -n week12 -- printenv APP_COLOR     # still blue
 
 ########################################################
-# Step 4 - A Secret as an environment variable and as a volume (slide 7)
+# Step 4 - A Secret, and the ServiceAccount token (slide 7)
 ########################################################
 printf 'paswrd' > DB_Password
 kubectl create secret generic app-secret -n week12 \
@@ -126,7 +137,8 @@ kubectl create secret generic app-secret -n week12 \
 kubectl get secret app-secret -n week12 -o jsonpath='{.data.DB_Password}' | base64 -d; echo
 
 # secretKeyRef reads one key. secretRef injects every key.
-tee secret-pod.yaml <<'EOF'
+# When env and envFrom set the same name, the value of env wins.
+cat > secret-pod.yaml <<'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -169,7 +181,7 @@ kubectl get secrets -n week12     # app-secret only
 # Step 5 - A second environment, and a Secret in etcd (slide 8)
 ########################################################
 # The same Pod manifest in a second namespace gets other values.
-tee config-dev.yaml <<'EOF'
+cat > config-dev.yaml <<'EOF'
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -208,14 +220,14 @@ kubectl -n kube-system exec etcd-masternode -- $ETCD \
 # Protect it: encryption at rest, RBAC, or an external secret store.
 
 ########################################################
-# Step 6 - Clean up                             (slide 9)
+# Step 6 - Delete the objects, and destroy the cluster (slide 9)
 ########################################################
 # ON THE MASTER - delete the Kubernetes objects.
 # Each Pod, ConfigMap and Secret belongs to one namespace. Kubernetes deletes them with it.
 # This step takes about 40 seconds.
 bash cleanup_lab12.sh
 
-# ON YOUR OWN MACHINE - remove the three EC2 instances.
+# ON YOUR OWN MACHINE - destroy the three EC2 instances.
 # ON YOUR OWN MACHINE:  terraform destroy          # asks for key_name again
 
 # Always destroy. The Learner Lab budget is small.

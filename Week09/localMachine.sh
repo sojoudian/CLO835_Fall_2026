@@ -102,16 +102,11 @@ kubectl uncordon workernode2
 kubectl get nodes
 
 ########################################################
-# Step 6 - Clean up                             (slide 9)
+# Step 6 - Destroy the cluster                  (slide 9)
 ########################################################
-# ON THE MASTER - remove the Kubernetes objects.
-bash cleanup_lab09.sh
-
-# Confirm that nothing is left.
-kubectl get pods,deployments | grep -E 'kubia|no-scheduler'
-
 # eksctl creates CloudFormation stacks. Here Terraform created 15 resources. A data line is a read.
 # ON YOUR OWN MACHINE - list the objects, then remove the three EC2 machines.
+# This also deletes every Kubernetes object and every file of the lab.
 # ON YOUR OWN MACHINE:  terraform state list
 # ON YOUR OWN MACHINE:  terraform destroy          # asks for key_name again
 

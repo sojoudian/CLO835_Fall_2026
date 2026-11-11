@@ -77,6 +77,10 @@ kubectl rollout undo deployment/nginx-deploy
 kubectl rollout status deployment/nginx-deploy
 
 ########################################################
-# Step 6 - clean up
+# Step 6 - Destroy the cluster
 ########################################################
-./cleanup_lab04.sh
+# ON YOUR OWN MACHINE - remove the three EC2 machines.
+# This also deletes every Kubernetes object and every file of the lab.
+# ON YOUR OWN MACHINE:  terraform destroy
+#
+# Always destroy. The Learner Lab budget is small.

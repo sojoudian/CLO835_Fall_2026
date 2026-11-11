@@ -42,28 +42,6 @@ nohup bash -c '
   done
 ' >/var/log/label-workers.log 2>&1 &
 
-# Step 13 of localMachine.sh calls ./cleanup_lab05.sh. The student runs
-# terraform on their own laptop, so that file never reaches this node. Write it
-# here, so the last step of the lab works with no copying.
-cat > /home/ubuntu/cleanup_lab05.sh <<'CLEANUP'
-#!/bin/bash
-# CLO835 - Lab 5 - remove everything the lab creates inside the cluster.
-# The three machines are removed by "terraform destroy" on your own laptop.
-set -uo pipefail
-
-kubectl delete service nginx-http 2>/dev/null
-kubectl delete rs kubia-rs 2>/dev/null
-kubectl delete pod nginx kubia pingpong web-with-sidecar 2>/dev/null
-kubectl delete namespace pingpong 2>/dev/null
-rm -f ./kubia-manual.yaml ./sidecar.yaml ./rs.yaml
-
-kubectl get deploy,rs,svc,pods --all-namespaces | grep -E "nginx|kubia|pingpong"
-
-echo "done"
-CLEANUP
-chmod +x /home/ubuntu/cleanup_lab05.sh
-chown ubuntu:ubuntu /home/ubuntu/cleanup_lab05.sh
-
 cat > /etc/motd <<'MOTD'
 
   CLO835 - Week 05 - Pods, ReplicaSets and Deployments

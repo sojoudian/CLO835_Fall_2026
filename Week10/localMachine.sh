@@ -5,7 +5,7 @@
 # Terraform builds 3 machines: 1 control plane and 2 workers. The cluster forms
 # itself at boot, the same way it did in Weeks 04 to 09.
 #
-# Each step matches one slide of Lab_week10_v4.pptx.
+# Each step matches one slide of Lab_week10_v5.pptx.
 
 ########################################################
 # Step 0 - check the cluster                    (slide 3)
@@ -182,15 +182,10 @@ kubectl exec dnstest -- nslookup -type=SRV kubia.default.svc.cluster.local
 kubectl delete pod dnstest
 
 ########################################################
-# Step 6 - Clean up                             (slide 9)
+# Step 6 - Destroy the cluster                  (slide 9)
 ########################################################
-# ON THE MASTER - stop the proxy and remove the Kubernetes objects.
-bash cleanup_lab10.sh
-
-# Confirm that nothing is left.
-kubectl get pods,pvc,pv
-
 # ON YOUR OWN MACHINE - remove the three EC2 machines.
+# This also deletes every Kubernetes object and every file of the lab.
 # ON YOUR OWN MACHINE:  terraform destroy          # asks for key_name again
 
 # Always destroy. The Learner Lab budget is small.

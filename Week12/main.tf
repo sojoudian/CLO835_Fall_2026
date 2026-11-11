@@ -68,7 +68,7 @@ locals {
 ########################################################
 resource "aws_security_group" "master" {
   name        = "week12-k8s-master"
-  description = "Week12 Kubernetes control-plane node"
+  description = "Week12 Kubernetes master node"
   vpc_id      = data.aws_vpc.default.id
 }
 

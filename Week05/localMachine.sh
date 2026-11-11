@@ -207,6 +207,10 @@ curl -s http://localhost:30000 | head -5
 #   http://<WORKER2-PUBLIC-IP>:30000
 
 ########################################################
-# Step 13 - clean up                            (slide 17)
+# Step 13 - Destroy the cluster                 (slide 17)
 ########################################################
-./cleanup_lab05.sh
+# ON YOUR OWN MACHINE - remove the three EC2 machines.
+# This also deletes every Kubernetes object and every file of the lab.
+# ON YOUR OWN MACHINE:  terraform destroy
+#
+# Always destroy. The Learner Lab budget is small.

@@ -194,15 +194,10 @@ kubectl exec pod-using-my-claim -- sh -c 'echo kept > /my-data/note.txt'
 kubectl exec pod-using-my-claim -- cat /my-data/note.txt
 
 ########################################################
-# Step 6 - Clean up                             (slide 9)
+# Step 6 - Destroy the cluster                  (slide 9)
 ########################################################
-# ON THE MASTER - remove the Kubernetes objects.
-bash cleanup_lab07.sh
-
-# Confirm that nothing is left.
-kubectl get pods,pvc,pv
-
 # ON YOUR OWN MACHINE - remove the three EC2 machines.
+# This also deletes every Kubernetes object and every file of the lab.
 # ON YOUR OWN MACHINE:  terraform destroy          # asks for key_name again
 
 # Always destroy. The Learner Lab budget is small.

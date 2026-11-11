@@ -5,15 +5,15 @@
 set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-# 1. Turn swap off. kubelet refuses to start while swap is on.
+# 1. Stop swap. The kubelet does not start while swap is on.
 swapoff -a
 sed -i '/ swap / s/^/#/' /etc/fstab
 
 # 2. Pin the network interface to a 1500-byte MTU.
 #    AWS gives these instances 9001-byte jumbo frames. Flannel then builds an
-#    8951-byte overlay. A NodePort reply bigger than 1500 bytes is dropped on
-#    the way to a browser on the internet, so the page never loads while the
-#    headers arrive fine. 1500 here makes Flannel compute 1450.
+#    8951-byte overlay. The internet path drops a NodePort reply bigger than
+#    1500 bytes, so a browser gets the headers but never the page. With 1500
+#    here, Flannel uses 1450.
 IFACE=$(ip route show default | awk '{print $5; exit}')
 ip link set dev "$IFACE" mtu 1500
 
@@ -33,7 +33,7 @@ WantedBy=multi-user.target
 SVC
 systemctl enable lab-mtu.service
 
-# 3. Kernel modules and sysctls for the pod network.
+# 3. Kernel modules and sysctls for the Pod network.
 cat >/etc/modules-load.d/k8s.conf <<'MOD'
 overlay
 br_netfilter
