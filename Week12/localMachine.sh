@@ -1,33 +1,35 @@
 #!/bin/bash
 # CLO835 - Week 12 - ConfigMaps and Secrets.
-# Run these ON THE MASTER NODE, section by section. Do NOT run the whole file.
+# Run the commands ON THE MASTER NODE, step by step, except the commands ON YOUR OWN MACHINE. Do NOT run the whole file.
 #
-# Terraform builds 3 machines: 1 master and 2 workers. The cluster forms
+# Terraform builds 3 EC2 instances: 1 master and 2 workers. The cluster forms
 # itself at boot, as in Weeks 04 to 10. The objects of the lab
 # are in the namespaces week12 and week12-dev.
 #
-# Each step matches one slide of Lab_week12_v6.pptx.
+# Each step matches one slide of Lab_week12_v7.pptx.
 
 ########################################################
-# Step 0 - check the cluster                    (slide 3)
+# Step 0 - Build and check the cluster          (slide 3)
 ########################################################
-# ON YOUR OWN MACHINE - get the repo, build 1 master + 2 workers (slide 3).
-# No clone yet? git clone https://github.com/sojoudian/CLO835_Fall_2026.git
-# git reset --hard replaces your local changes in the repo with the files of GitHub.
+# ON YOUR OWN MACHINE - get the repo. Then build 1 master and 2 workers.
+# If no clone exists: git clone https://github.com/sojoudian/CLO835_Fall_2026.git
+# git reset --hard replaces your changes with the files of GitHub.
 # ON YOUR OWN MACHINE:  cd CLO835_Fall_2026 && git fetch && git reset --hard origin/master
 # ON YOUR OWN MACHINE:  cd Week12 && terraform init
 # ON YOUR OWN MACHINE:  terraform apply          # Terraform asks for key_name
+# These two commands show the public and the private addresses.
 # ON YOUR OWN MACHINE:  terraform output public_ips
 # ON YOUR OWN MACHINE:  terraform output private_ips
+# kubeadm forms the cluster at boot. Wait about 4 minutes.
 # ON YOUR OWN MACHINE:  ssh -i <your-key>.pem ubuntu@<masternode-public-ip>
-# ON THE MASTER - all three nodes must reach Ready. The workers take a few minutes to join.
+# ON THE MASTER - check the three nodes
 kubectl get nodes -o wide
 kubectl get pods -n kube-system
 
 ########################################################
 # Step 1 - args replaces the CMD of the image   (slide 4)
 ########################################################
-# A namespace for the objects of the lab.
+# Create a namespace for the objects of the lab.
 kubectl create namespace week12
 
 # The image: ENTRYPOINT ["/bin/fortuneloop.sh"], CMD ["10"].
@@ -118,7 +120,7 @@ kubectl wait --for=condition=Ready pod/config-volume -n week12 --timeout=120s
 kubectl exec config-volume -n week12 -- ls /etc/app-config
 kubectl exec config-volume -n week12 -- cat /etc/app-config/APP_COLOR; echo
 
-# Change the ConfigMap. The kubelet updates the file within about one minute.
+# Change the ConfigMap. The kubelet updates the file within about two minutes.
 # An environment variable gets its value when the container starts.
 # It does not change while the container runs.
 kubectl patch configmap app-config -n week12 -p '{"data":{"APP_COLOR":"green"}}'
@@ -137,7 +139,7 @@ kubectl create secret generic app-secret -n week12 \
 kubectl get secret app-secret -n week12 -o jsonpath='{.data.DB_Password}' | base64 -d; echo
 
 # secretKeyRef reads one key. secretRef injects every key.
-# When env and envFrom set the same name, the value of env wins.
+# When env and envFrom set the same name, the value of env has priority.
 cat > secret-pod.yaml <<'EOF'
 apiVersion: v1
 kind: Pod
@@ -181,6 +183,7 @@ kubectl get secrets -n week12     # app-secret only
 # Step 5 - A second environment, and a Secret in etcd (slide 8)
 ########################################################
 # The same Pod manifest in a second namespace gets other values.
+# These values are for the lab only. Put no Secret manifest in source control.
 cat > config-dev.yaml <<'EOF'
 apiVersion: v1
 kind: Namespace
@@ -220,14 +223,10 @@ kubectl -n kube-system exec etcd-masternode -- $ETCD \
 # Protect it: encryption at rest, RBAC, or an external secret store.
 
 ########################################################
-# Step 6 - Delete the objects, and destroy the cluster (slide 9)
+# Step 6 - Destroy the cluster                  (slide 9)
 ########################################################
-# ON THE MASTER - delete the Kubernetes objects.
-# Each Pod, ConfigMap and Secret belongs to one namespace. Kubernetes deletes them with it.
-# This step takes about 40 seconds.
-bash cleanup_lab12.sh
-
 # ON YOUR OWN MACHINE - destroy the three EC2 instances.
-# ON YOUR OWN MACHINE:  terraform destroy          # asks for key_name again
+# This also deletes every Kubernetes object and every file of the lab.
+# ON YOUR OWN MACHINE:  terraform destroy          # Terraform asks for key_name again
 
-# Always destroy. The Learner Lab budget is small.
+# Destroy the cluster at the end of each lab. The Learner Lab budget is small.

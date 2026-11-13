@@ -1,5 +1,5 @@
 
-# === Control-plane init. This is appended after bootstrap.sh and runs as root. ===
+# === Control-plane init. Terraform appends this to bootstrap.sh, and it runs as root. ===
 
 # Set the hostname first. kubeadm uses it as the Kubernetes node name.
 hostnamectl set-hostname masternode
@@ -16,14 +16,14 @@ kubeadm init \
   --apiserver-advertise-address="$PRIVATE_IP" \
   --apiserver-cert-extra-sans="$PUBLIC_IP"
 
-# kubeconfig for the ubuntu user, so kubectl works right after you SSH in.
+# Give the ubuntu user a kubeconfig, so kubectl works when you connect with SSH.
 mkdir -p /home/ubuntu/.kube
 cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
 chown -R ubuntu:ubuntu /home/ubuntu/.kube
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
-# Flannel v0.28.10 (Apache License 2.0). The images are copies on the maziar account.
+# This manifest installs Flannel v0.28.10 (Apache License 2.0). The images are copies on the maziar account.
 cat > /root/kube-flannel.yml <<'MANIFEST'
 apiVersion: v1
 kind: Namespace
@@ -241,16 +241,16 @@ spec:
         name: xtables-lock
 MANIFEST
 
-# The API server drops connections for a moment right after init, and again
-# when Flannel reconfigures the network. One failed kubectl under "set -e"
-# would kill this whole script, so the apply retries until it sticks.
+# The API server drops connections for a short time after init, and again
+# when Flannel reconfigures the network. Under "set -e", one failed kubectl
+# command can stop this whole script, so the script tries the apply again until it works.
 until kubectl apply -f /root/kube-flannel.yml; do
-  echo "Flannel apply failed; retrying in 10s..."
+  echo "The Flannel apply failed. The script tries the apply again in 10 seconds."
   sleep 10
 done
 
 # Label the workers as they join. This runs in the background, so cloud-init
-# is not blocked while it waits.
+# continues while it waits.
 nohup bash -c '
   for i in $(seq 1 60); do
     for node in $(kubectl get nodes -l "!node-role.kubernetes.io/control-plane" -o name 2>/dev/null); do
@@ -265,7 +265,7 @@ cat > /etc/motd <<'MOTD'
   CLO835 - Week 13 - Authentication and RBAC
   ------------------------------------------
   You are on the MASTER node. kubectl is ready.
-  The two workers join by themselves. Give them a few minutes.
+  The two workers join the cluster at boot. Wait until all three nodes are Ready.
 
   Check first:   kubectl get nodes -o wide
   Then follow:   localMachine.sh, step by step.

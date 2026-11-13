@@ -2,7 +2,7 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Latest Ubuntu 26.04 LTS (Resolute Raccoon), x86_64, from Canonical.
+# The lab uses the latest Ubuntu 26.04 LTS AMI (Resolute Raccoon, amd64) from Canonical.
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
@@ -17,7 +17,7 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-# Default VPC. The Learner Lab does not permit a new VPC.
+# The lab uses the default VPC. Terraform builds no VPC and no subnet.
 data "aws_vpc" "default" {
   default = true
 }
@@ -45,8 +45,7 @@ data "aws_ec2_instance_type_offerings" "for_type" {
 }
 
 locals {
-  # m5.large: 2 vCPU / 8 GB. The Learner Lab blocks xlarge and larger, and it
-  # stops newer generations such as r6i a few seconds after launch.
+  # m5.large has 2 vCPU and 8 GiB of memory. The Learner Lab blocks the xlarge size and each larger size.
   instance_type = "m5.large"
 
   # All three nodes share ONE subnet and ONE availability zone. kubeadm and
@@ -57,9 +56,9 @@ locals {
     if contains(local.good_zones, s.availability_zone)
   ])[0]
 
-  # kubeadm bootstrap token, shared by the master (--token) and the workers
-  # (--token). The workers join without copying anything from the master.
-  # Format: 6 chars "." 16 chars, lowercase letters and digits. Lab only.
+  # The master (--token) and the workers (--token) share this kubeadm
+  # bootstrap token. The workers copy nothing from the master to join.
+  # The token has 6 characters, ".", then 16 characters (lowercase letters and digits). Use it only in the lab.
   k8s_token = "week13.0123456789abcdef"
 }
 
@@ -68,7 +67,7 @@ locals {
 ########################################################
 resource "aws_security_group" "master" {
   name        = "week13-k8s-master"
-  description = "Week13 Kubernetes control-plane node"
+  description = "Week13 Kubernetes master node"
   vpc_id      = data.aws_vpc.default.id
 }
 
@@ -79,10 +78,10 @@ resource "aws_security_group" "worker" {
 }
 
 # --- Node to node: allow ALL traffic between the cluster nodes ---
-# This covers every component port without listing each one:
+# These rules open each component port. The ports are:
 #   etcd 2379-2380, kubelet 10250, kube-scheduler 10259,
 #   kube-controller-manager 10257, kube-proxy 10256,
-#   API 6443 node to node, Flannel VXLAN 8472/UDP.
+#   API server 6443 node to node, Flannel VXLAN 8472/UDP.
 resource "aws_security_group_rule" "master_from_self" {
   type              = "ingress"
   security_group_id = aws_security_group.master.id
@@ -131,9 +130,9 @@ resource "aws_security_group_rule" "master_ssh" {
 }
 
 # Port 6443 (the API server) is NOT open to the internet. Every kubectl
-# command of this lab runs on the master, and the workers reach the API
+# command of this lab runs on the master, and the workers reach the API server
 # through the node-to-node rules above. The bootstrap token is in a public
-# repository, so the API must not answer outside the cluster.
+# repo, so the API server must not answer outside the cluster.
 
 resource "aws_security_group_rule" "worker_ssh" {
   type              = "ingress"
@@ -145,7 +144,8 @@ resource "aws_security_group_rule" "worker_ssh" {
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
-# A NodePort Service opens its port on EVERY node, so open the range on both.
+# A NodePort Service opens its port on EVERY node, so the two rules below open the NodePort range
+# in both security groups.
 resource "aws_security_group_rule" "master_nodeport" {
   type              = "ingress"
   security_group_id = aws_security_group.master.id
@@ -190,7 +190,7 @@ resource "aws_security_group_rule" "worker_egress" {
 #
 # The cluster forms itself at boot. bootstrap.sh installs the kubeadm
 # prerequisites on every node. The master then runs kubeadm init and installs
-# Flannel. Each worker retries kubeadm join until the API answers.
+# Flannel. Each worker tries kubeadm join again until the control plane answers.
 ########################################################
 resource "aws_instance" "master" {
   ami                    = data.aws_ami.ubuntu.id

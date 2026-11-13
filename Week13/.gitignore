@@ -7,7 +7,7 @@ terraform.tfvars
 *.tfplan
 crash.log
 
-# Keys / secrets — never commit these
+# Keys and secrets: never commit these
 *.pem
 *.ppk
 credentials

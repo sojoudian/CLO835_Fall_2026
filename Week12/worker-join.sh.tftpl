@@ -1,14 +1,14 @@
 
-# === Worker join. This is appended after bootstrap.sh and runs as root. ===
+# === Worker join. Terraform appends this to bootstrap.sh, and it runs as root. ===
 
 # Set the hostname first. kubeadm uses it as the Kubernetes node name.
 hostnamectl set-hostname ${node_name}
 echo "127.0.0.1 ${node_name}" >> /etc/hosts
 
-# Retry until the control plane answers. The master may still be running
-# kubeadm init when this node is ready.
+# Try kubeadm join again until the control plane answers. The master can
+# still run kubeadm init when this node starts kubeadm join.
 until kubeadm join ${master_ip}:6443 --token=${k8s_token} --discovery-token-unsafe-skip-ca-verification; do
-  echo "Control plane not reachable yet; retrying in 15s..."
+  echo "The control plane does not answer. This node tries kubeadm join again in 15 seconds."
   sleep 15
 done
 

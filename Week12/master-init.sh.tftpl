@@ -16,14 +16,14 @@ kubeadm init \
   --apiserver-advertise-address="$PRIVATE_IP" \
   --apiserver-cert-extra-sans="$PUBLIC_IP"
 
-# kubeconfig for the ubuntu user, so kubectl works when you connect with SSH.
+# Give the ubuntu user a kubeconfig, so kubectl works when you connect with SSH.
 mkdir -p /home/ubuntu/.kube
 cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
 chown -R ubuntu:ubuntu /home/ubuntu/.kube
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
-# Flannel v0.28.10 (Apache License 2.0). The images are copies on the maziar account.
+# This manifest installs Flannel v0.28.10 (Apache License 2.0). The images are copies on the maziar account.
 cat > /root/kube-flannel.yml <<'MANIFEST'
 apiVersion: v1
 kind: Namespace
@@ -241,11 +241,11 @@ spec:
         name: xtables-lock
 MANIFEST
 
-# The API server drops connections for a moment right after init, and again
-# when Flannel reconfigures the network. One failed kubectl under "set -e"
-# would stop this whole script, so the apply tries again until it works.
+# The API server drops connections for a short time after init, and again
+# when Flannel reconfigures the network. Under "set -e", one failed kubectl
+# command can stop this whole script, so the script tries the apply again until it works.
 until kubectl apply -f /root/kube-flannel.yml; do
-  echo "Flannel apply failed; retrying in 10s..."
+  echo "The Flannel apply failed. The script tries the apply again in 10 seconds."
   sleep 10
 done
 
@@ -260,32 +260,12 @@ nohup bash -c '
   done
 ' >/var/log/label-workers.log 2>&1 &
 
-# The last step of localMachine.sh runs bash cleanup_lab12.sh. The student runs
-# terraform on their own machine, so that file never reaches this node. Write it
-# here, so the last step of the lab works with no copy.
-cat > /home/ubuntu/cleanup_lab12.sh <<'CLEANUP'
-#!/bin/bash
-# CLO835 - Lab Week 12 - delete the objects and the files that the lab creates.
-# On your own machine, "terraform destroy" destroys the three machines.
-set -uo pipefail
-
-kubectl delete namespace week12 week12-dev --ignore-not-found
-rm -f ./fortune-args.yaml ./config-env.yaml ./config-volume.yaml ./secret-pod.yaml
-rm -f ./config-dev.yaml ./LOG_LEVEL ./DB_Password
-
-kubectl get namespaces | grep week12
-
-echo "done"
-CLEANUP
-chmod +x /home/ubuntu/cleanup_lab12.sh
-chown ubuntu:ubuntu /home/ubuntu/cleanup_lab12.sh
-
 cat > /etc/motd <<'MOTD'
 
   CLO835 - Week 12 - ConfigMaps and Secrets
   -----------------------------------------
   You are on the MASTER node. kubectl is ready.
-  The two workers join by themselves. Give them a few minutes.
+  The two workers join the cluster at boot. Wait until all three nodes are Ready.
 
   Check first:   kubectl get nodes -o wide
   Then follow:   localMachine.sh, step by step.
